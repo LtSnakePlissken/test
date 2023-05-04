@@ -155,10 +155,10 @@ contract StakingFee is Staking, IStakingFee {
         uint256 _amount
     ) internal virtual override returns (uint256) {
         uint256 fee = depositFee(_amount);
-        userLastStakedTime[msg.sender] = uint32(block.timestamp);
+        userLastStakedTime[_account] = uint32(block.timestamp);
         if (fee > 0) {
             collectedFees += fee;
-            emit DepositFeesCollected(msg.sender, fee);
+            emit DepositFeesCollected(_account, fee);
         }
         return super._beforeStake(_account, _amount - fee);
     }
@@ -170,10 +170,10 @@ contract StakingFee is Staking, IStakingFee {
         address _account,
         uint256 _amount
     ) internal virtual override returns (uint256) {
-        uint256 fee = withdrawalFee(msg.sender, _amount);
+        uint256 fee = withdrawalFee(_account, _amount);
         if (fee > 0) {
             collectedFees += fee;
-            emit WithdrawalFeesCollected(msg.sender, fee);
+            emit WithdrawalFeesCollected(_account, fee);
         }
         return super._beforeWithdraw(_account, _amount - fee);
     }

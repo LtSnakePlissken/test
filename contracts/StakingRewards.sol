@@ -142,7 +142,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
     function getReward(
         address _tokenAddress,
         address _recipient
-    ) public nonReentrant updateRewards(msg.sender) {
+    ) public nonReentrant updateRewards(_recipient) {
         return _getReward(_tokenAddress, _recipient);
     }
 
@@ -152,7 +152,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      */
     function getRewards(
         address _recipient
-    ) public nonReentrant updateRewards(msg.sender) {
+    ) public nonReentrant updateRewards(_recipient) {
         for (uint i = 0; i < rewardTokens.length; ++i) {
             _getReward(address(rewardTokens[i]), _recipient);
         }
@@ -339,7 +339,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @dev Override _beforeExit() hook to claim all rewards for the account exiting
      */
     function _beforeExit(address _account) internal virtual override {
-        getRewards(msg.sender);
+        getRewards(_account);
         super._beforeExit(_account);
     }
 
