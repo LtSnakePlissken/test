@@ -13,9 +13,9 @@ import "./IStaking.sol";
 
 interface IStakingFee is IStaking {
     /* ========== STATE VARIABLES ========== */
-    function feesUnit() external returns (uint16);
+    function feesUnit() external returns (uint256);
 
-    function maxFee() external returns (uint16);
+    function maxFee() external returns (uint256);
 
     function withdrawalFeeSchedule(uint256) external returns (uint256);
 
@@ -39,13 +39,7 @@ interface IStakingFee is IStaking {
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function recoverFees(address _recipient) external;
-
-    function setFees(
-        uint16 _depositFeeBps,
-        uint16[] memory _withdrawalFeesBps,
-        uint32[] memory _withdrawalFeeSchedule
-    ) external;
-
+    
     /* ========== EVENTS ========== */
 
     // Emitted when fees are (re)configured

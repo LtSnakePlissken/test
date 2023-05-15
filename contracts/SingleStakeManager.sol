@@ -149,27 +149,7 @@ contract SingleStakeManager is ISingleStakeManager, Ownable {
     }
 
     /* ========== FEES ========== */
-
-    /**
-     * @notice Allows the farm owner to set the withdrawal and deposit fees to be used in the farm.
-     * @param _singleStakeAddress The address of the SingleStakingRewards contract.
-     * @param _depositFeeBps The deposit fee in basis points.
-     * @param _withdrawalFeesBps The withdrawal fee in basis points.
-     * @param _withdrawalFeeSchedule The schedule for the withdrawal fee to be applied.
-     */
-    function setFees(
-        address _singleStakeAddress,
-        uint16 _depositFeeBps,
-        uint16[] memory _withdrawalFeesBps,
-        uint32[] memory _withdrawalFeeSchedule
-    ) external checkOwnership(_singleStakeAddress) {
-        ISingleStakingRewards(_singleStakeAddress).setFees(
-            _depositFeeBps,
-            _withdrawalFeesBps,
-            _withdrawalFeeSchedule
-        );
-    }
-
+    
     /**
      * @notice Withdraw fees collected from deposits/withdrawals in the SingleStakingRewards contract to msg.sender.
      * @param _singleStakeAddress The address of the SingleStakingRewards contract.

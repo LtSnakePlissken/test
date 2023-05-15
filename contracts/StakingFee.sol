@@ -23,10 +23,10 @@ contract StakingFee is Staking, IStakingFee {
     /* ========== STATE VARIABLES ========== */
 
     /// @notice Constant Fee Unit (1e4)
-    uint16 public constant feesUnit = 10000;
+    uint256 public constant feesUnit = 10000;
 
     /// @notice Maximum fee (20%)
-    uint16 public constant maxFee = 2000;
+    uint256 public constant maxFee = 2000;
 
     /// @notice Schedule of withdrawal fees represented as a sorted array of durations
     /// @dev example: 10% after 1 hour, 1% after a day, 0% after a week => [3600, 86400]
@@ -59,7 +59,7 @@ contract StakingFee is Staking, IStakingFee {
         uint16[] memory _withdrawalFeesBps,
         uint32[] memory _withdrawalFeeSchedule
     ) Staking(_stakingTokenAddress) {
-        setFees(_depositFeeBps, _withdrawalFeesBps, _withdrawalFeeSchedule);
+        _setFees(_depositFeeBps, _withdrawalFeesBps, _withdrawalFeeSchedule);
     }
 
     /* ========== VIEWS ========== */
@@ -83,16 +83,17 @@ contract StakingFee is Staking, IStakingFee {
         address _account,
         uint256 _withdrawalAmount
     ) public view returns (uint256) {
+        uint256 userLastStakedTimestampDiff = block.timestamp - userLastStakedTime[_account];
+        uint256 withdrawalFeeAmount;
         for (uint i = 0; i < withdrawalFeeSchedule.length; ++i) {
-            if (
-                block.timestamp - userLastStakedTime[_account] <
-                withdrawalFeeSchedule[i]
-            ) {
-                return (_withdrawalAmount * withdrawalFeesBps[i]) / feesUnit;
+            if (userLastStakedTimestampDiff < withdrawalFeeSchedule[i]) {
+                withdrawalFeeAmount = (_withdrawalAmount * withdrawalFeesBps[i]) / feesUnit;
+                break;
             }
         }
-        return 0;
+        return withdrawalFeeAmount;
     }
+
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
@@ -109,23 +110,23 @@ contract StakingFee is Staking, IStakingFee {
         stakingToken.safeTransfer(_recipient, previousFees);
     }
 
+    /* ========== PRIVATE FUNCTIONS ========== */
+
     /**
      * @dev Configure the fees for this contract.
      * @param _depositFeeBps deposit fee in basis points
      * @param _withdrawalFeesBps withdrawal fees in basis points
      * @param _withdrawalFeeSchedule withdrawal fees schedule
      */
-    function setFees(
+    function _setFees(
         uint16 _depositFeeBps,
         uint16[] memory _withdrawalFeesBps,
         uint32[] memory _withdrawalFeeSchedule
-    ) public onlyOwner {
-        _beforeSetFees();
-        require(_withdrawalFeeSchedule.length == _withdrawalFeesBps.length && _withdrawalFeeSchedule.length <= 10, "E5");
-        require(_depositFeeBps < maxFee + 1, "E6");
+    ) private {
+        require(_withdrawalFeeSchedule.length == _withdrawalFeesBps.length && _withdrawalFeeSchedule.length <= 10 && _depositFeeBps <= maxFee, "E5");
 
         uint32 lastFeeSchedule = 0;
-        uint16 lastWithdrawalFee = maxFee + 1;
+        uint256 lastWithdrawalFee = maxFee + 1;
 
         for (uint i = 0; i < _withdrawalFeeSchedule.length; ++i) {
             require(_withdrawalFeeSchedule[i] > lastFeeSchedule, "E7");
@@ -183,9 +184,4 @@ contract StakingFee is Staking, IStakingFee {
      * @param _recipient recovery address
      */
     function _beforeRecoverFees(address _recipient) internal virtual {}
-
-    /**
-     * @dev Internal hook called before setting fees (in the setFees() function).
-     */
-    function _beforeSetFees() internal virtual {}
 }

@@ -48,13 +48,6 @@ interface IFarmManager {
 
     function recoverLeftoverCoverage(address _farmAddress) external;
 
-    function setFees(
-        address _farmAddress,
-        uint16 _depositFeeBps,
-        uint16[] memory _withdrawalFeesBps,
-        uint32[] memory _withdrawalFeeSchedule
-    ) external;
-
     function recoverFees(address _farmAddress) external;
 
     function multiClaim(address[] memory _farms) external;

@@ -37,7 +37,7 @@ contract FarmingRewards is StakingRewards, IFarmingRewards {
     uint256 public coverageAmount;
 
     /// @notice Time until a farmed position is fully covered against impermanent loss (100%)
-    uint32 public coverageVestingDuration;
+    uint256 public coverageVestingDuration;
 
     /// @notice Rate of coverage vesting
     uint256 public coverageRate;
@@ -235,9 +235,12 @@ contract FarmingRewards is StakingRewards, IFarmingRewards {
      */
     function setCoverage(address _tokenAddress, uint256 _coverageAmount, uint32 _coverageVestingDuration) external onlyOwner whenNotEmitting {
         require(coveragePerTokenStored == 0, "E24");
-        require(lpToken.token0() == _tokenAddress || lpToken.token1() == _tokenAddress, "E19");
-        require(_coverageVestingDuration >= 24 * 3600, "E21");
-        require(_coverageVestingDuration <= rewardsDuration, "E22");
+        require(
+            (lpToken.token0() == _tokenAddress || lpToken.token1() == _tokenAddress) &&
+            (_coverageVestingDuration >= 24 * 3600) &&
+            (_coverageVestingDuration <= rewardsDuration),
+            "E19"
+        );
         coverageTokenAddress = _tokenAddress;
         coverageAmount = _coverageAmount;
         coverageVestingDuration = _coverageVestingDuration;
@@ -317,8 +320,7 @@ contract FarmingRewards is StakingRewards, IFarmingRewards {
      * @return the corresponding LP position (amount0, amount1, timestamp)
      */
     function position(uint256 _amount) private view returns (Position memory) {
-        (uint112 reserve0, uint112 reserve1, uint32 timestamp) = lpToken
-            .getReserves();
+        (uint112 reserve0, uint112 reserve1, uint32 timestamp) = lpToken.getReserves();
         uint256 totalAmount = lpToken.totalSupply();
         return Position(uint112((_amount * reserve0) / totalAmount), uint112((_amount * reserve1) / totalAmount), timestamp);
     }
@@ -335,42 +337,7 @@ contract FarmingRewards is StakingRewards, IFarmingRewards {
             oracle.consultWeth(lpToken.token0(), _position.amount0) +
             oracle.consultWeth(lpToken.token1(), _position.amount1);
     }
-
-    /**
-     * @dev Return the coverage in WETH for the given HODL and OUT values.
-     * @param _hodlValue the value (in WETH) if the tokens making up the LP were kept unpaired
-     * @param _outValue the value (in WETH) of the LP token position
-     * @return coverage in WETH
-     */
-    function wethCoverage(
-        uint256 _hodlValue,
-        uint256 _outValue
-    ) private pure returns (uint256) {
-        if (_hodlValue > _outValue) {
-            // there is IL
-            // hodl value - out value
-            return _hodlValue - _outValue;
-        }
-        return 0;
-    }
-
-    /**
-     * @dev Return the coverage in coverage token amount for the given HODL and OUT values.
-     * @param _hodlValue the value (in WETH) if the tokens making up the LP were kept unpaired
-     * @param _outValue the value (in WETH) of the LP token position
-     * @return coverage in coverage token amount
-     */
-    function tokenCoverage(
-        uint256 _hodlValue,
-        uint256 _outValue
-    ) private view returns (uint256) {
-        uint256 wethCov = wethCoverage(_hodlValue, _outValue);
-        if (wethCov == 0) {
-            return 0;
-        }
-        return oracle.consult(oracle.weth(), wethCov, coverageTokenAddress);
-    }
-
+    
     /**
      * @dev Return the vested coverage in coverage token amount for the given HODL and OUT values since the provided timestamp.
      * @param _hodlValue the value (in WETH) if the tokens making up the LP were kept unpaired
@@ -384,10 +351,12 @@ contract FarmingRewards is StakingRewards, IFarmingRewards {
         uint32 _lastTimestamp
     ) private view returns (uint256) {
         uint256 timeElapsed = block.timestamp - _lastTimestamp;
+        uint256 wethCov = _hodlValue > _outValue ? _hodlValue - _outValue : 0;
+        uint256 tokenCoverage = wethCov == 0 ? 0 : oracle.consult(oracle.weth(), wethCov, coverageTokenAddress);
         if (timeElapsed >= coverageVestingDuration) {
-            return tokenCoverage(_hodlValue, _outValue);
+            return tokenCoverage;
         }
-        return (tokenCoverage(_hodlValue, _outValue) * timeElapsed) / coverageVestingDuration;
+        return (tokenCoverage * timeElapsed) / coverageVestingDuration;
     }
 
     /* ========== HOOKS ========== */
@@ -416,7 +385,9 @@ contract FarmingRewards is StakingRewards, IFarmingRewards {
      * @dev Override _beforeExit() hook to claim all coverage for the account exiting
      */
     function _beforeExit(address _account) internal virtual override {
-        getCoverage(_account);
+        if (coverageTokenAddress != address(0)) {
+            getCoverage(_account);
+        }
         super._beforeExit(_account);
     }
 
@@ -454,7 +425,7 @@ contract FarmingRewards is StakingRewards, IFarmingRewards {
     modifier updateCoverage(address _account) {
         if (coverageTokenAddress != address(0)) {
             coveragePerTokenStored = coveragePerToken();
-            lastUpdateTime = lastTimeRewardApplicable(); // it seems fine to reuse this here
+            lastUpdateTime = lastTimeRewardApplicable(); // it seems fine to redo this here
             oracle.update(lpToken.token0(), oracle.weth()); // update oracle for first token
             oracle.update(lpToken.token1(), oracle.weth()); // ditto for the second token
             if (_account != address(0)) {

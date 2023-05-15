@@ -31,7 +31,7 @@ interface IFarmingRewards is IStakingRewards {
 
     function coverageAmount() external returns (uint256);
 
-    function coverageVestingDuration() external returns (uint32);
+    function coverageVestingDuration() external returns (uint256);
 
     function coverageRate() external returns (uint256);
 

@@ -38,14 +38,7 @@ interface ISingleStakeManager {
         address _tokenAddress,
         uint256 _amount
     ) external;
-
-    function setFees(
-        address _singleStakeAddress,
-        uint16 _depositFeeBps,
-        uint16[] memory _withdrawalFeesBps,
-        uint32[] memory _withdrawalFeeSchedule
-    ) external;
-
+    
     function recoverFees(address _singleStakeAddress) external;
 
     function multiClaim(address[] memory _farms) external;

@@ -20,9 +20,9 @@ interface IStaking {
     function balances(address _account) external returns (uint256);
 
     /* ========== MUTATIVE FUNCTIONS ========== */
-    function stake(uint256 _amount) external returns (uint256);
+    function stake(uint256 _amount) external;
 
-    function withdraw(uint256 _amount) external returns (uint256);
+    function withdraw(uint256 _amount) external;
 
     function exit() external;
 

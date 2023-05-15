@@ -45,40 +45,38 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
      * @dev Stake tokens.
      * Note: the contract must have sufficient allowance for the staking token.
      * @param _amount amount to stake
-     * @return staked amount (may differ from input amount due to e.g., fees)
      */
-    function stake(uint256 _amount) public nonReentrant returns (uint256) {
+    function stake(uint256 _amount) public nonReentrant {
+        uint256 originalAmount = _amount;
         _amount = _beforeStake(msg.sender, _amount);
-        require(_amount > 0, "E2"); // Check after the hook
+        require(_amount > 0 && originalAmount > 0, "E2"); // Check after the hook
         totalSupply += _amount;
         balances[msg.sender] += _amount;
-        stakingToken.safeTransferFrom(msg.sender, address(this), _amount);
+        stakingToken.safeTransferFrom(msg.sender, address(this), originalAmount);
         emit Staked(msg.sender, _amount);
-        return _amount;
     }
 
     /**
-     * @dev Withdraw previously stake tokens.
+     * @dev Withdraw previously staked tokens.
      * @param _amount amount to withdraw
-     * @return withdrawn amount (may differ from input amount due to e.g., fees)
      */
-    function withdraw(uint256 _amount) public nonReentrant returns (uint256) {
+    function withdraw(uint256 _amount) public nonReentrant {
+        uint256 originalAmount = _amount;
         _amount = _beforeWithdraw(msg.sender, _amount);
         require(
-            _amount > 0 && _amount <= balances[msg.sender],
+            _amount > 0 && _amount <= balances[msg.sender] && originalAmount <= balances[msg.sender],
             "E3"
         ); // Check after the hook
-        totalSupply -= _amount;
-        balances[msg.sender] -= _amount;
+        totalSupply -= originalAmount;
+        balances[msg.sender] -= originalAmount;
         stakingToken.safeTransfer(msg.sender, _amount);
         emit Withdrawn(msg.sender, _amount);
-        return _amount;
     }
 
     /**
      * @dev Exit the farm, i.e., withdraw the entire token balance of the calling account
      */
-    function exit() external nonReentrant {
+    function exit() external {
         _beforeExit(msg.sender);
         withdraw(balances[msg.sender]);
     }

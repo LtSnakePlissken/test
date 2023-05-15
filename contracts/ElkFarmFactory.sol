@@ -56,7 +56,7 @@ contract ElkFarmFactory is IElkFarmFactory, Ownable {
     uint256 public fee = 1000 * 10 ** 18;
 
     /// @notice maximum allowed fee.
-    uint256 public maxFee = 10000000 * 10 ** 18;
+    uint256 public maxFee = 100000 * 10 ** 18;
 
     /// @notice oracle address
     address public oracleAddress;
@@ -226,16 +226,9 @@ contract ElkFarmFactory is IElkFarmFactory, Ownable {
 
     /**
      * @notice Utility function used by Elk to recover the fees gathered by the factory.
-     */
-    function withdrawFees() external onlyOwner {
-        _withdrawFees();
-    }
-
-    /**
-     * @notice Utility function used by Elk to recover the fees gathered by the factory.
      * @notice emits a FeesRecovered event with the amount recovered.
      */
-    function _withdrawFees() private {
+    function withdrawFees() external onlyOwner {
         uint256 balance = feeToken.balanceOf(address(this));
         feeToken.transfer(msg.sender, balance);
         emit FeesRecovered(balance);
@@ -246,14 +239,6 @@ contract ElkFarmFactory is IElkFarmFactory, Ownable {
      * @param _farmAddress The address of the farm to be changed.
      */
     function overrideOwnership(address _farmAddress) external onlyOwner {
-        _overrideOwnership(_farmAddress);
-    }
-
-    /**
-     * @dev This function is available to FaaS governance in case any "Scam" or nefarious farms are created using the contract. Governance will be able to stop the offending farm and allow users to recover funds.
-     * @param _farmAddress The address of the farm to be stopped.
-     */
-    function _overrideOwnership(address _farmAddress) private {
         require(
             isFarm[_farmAddress] || isPermissionedFarm[_farmAddress],
             "NF1"

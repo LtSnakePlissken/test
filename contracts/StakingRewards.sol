@@ -43,11 +43,11 @@ contract StakingRewards is StakingFee, IStakingRewards {
     /// @notice How many tokens are emitted per staked token
     mapping(address => uint256) public rewardPerTokenStored;
 
-    /// @notice How many reward tokens were paid per user (wallet address => token address => amount)
+    /// @notice How many reward tokens were paid per user (token address => wallet address => amount)
     mapping(address => mapping(address => uint256))
         public userRewardPerTokenPaid;
 
-    /// @notice Accumulator of reward tokens per user (wallet address => token address => amount)
+    /// @notice Accumulator of reward tokens per user (token address => wallet address => amount)
     mapping(address => mapping(address => uint256)) public rewards;
 
     /* ========== CONSTRUCTOR ========== */
@@ -326,12 +326,12 @@ contract StakingRewards is StakingFee, IStakingRewards {
     /* ========== HOOKS ========== */
 
     /**
-     * @dev Override _beforeStake() hook to ensure staking is only possible when rewards are emitting
+     * @dev Override _beforeStake() hook to ensure staking is only possible when rewards are emitting and update the rewards
      */
     function _beforeStake(
         address _account,
         uint256 _amount
-    ) internal virtual override whenEmitting returns (uint256) {
+    ) internal virtual override whenEmitting updateRewards(_account) returns (uint256) {
         return super._beforeStake(_account, _amount);
     }
 
@@ -339,7 +339,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @dev Override _beforeExit() hook to claim all rewards for the account exiting
      */
     function _beforeExit(address _account) internal virtual override {
-        getRewards(_account);
+        getRewards(_account); // getRewards calls updateRewards so we don't need to call it explicitly again here
         super._beforeExit(_account);
     }
 
@@ -353,14 +353,6 @@ contract StakingRewards is StakingFee, IStakingRewards {
     ) internal virtual override {
         require(!rewardTokenAddresses[_tokenAddress], "E16");
         super._beforeRecoverERC20(_tokenAddress, _recipient, _amount);
-    }
-
-    /**
-     * @dev Override _beforeSetFees() hook to prevent settings fees when rewards are emitting
-     */
-    function _beforeSetFees() internal virtual override {
-        require(block.timestamp > periodFinish, "E17");
-        super._beforeSetFees();
     }
 
     /**
@@ -399,17 +391,12 @@ contract StakingRewards is StakingFee, IStakingRewards {
         for (uint i = 0; i < rewardTokens.length; ++i) {
             address tokenAddress = address(rewardTokens[i]);
             rewardPerTokenStored[tokenAddress] = rewardPerToken(tokenAddress);
-            lastUpdateTime = lastTimeRewardApplicable();
             if (_account != address(0)) {
-                rewards[tokenAddress][_account] = earned(
-                    tokenAddress,
-                    _account
-                );
-                userRewardPerTokenPaid[tokenAddress][
-                    _account
-                ] = rewardPerTokenStored[tokenAddress];
+                rewards[tokenAddress][_account] = earned(tokenAddress, _account);
+                userRewardPerTokenPaid[tokenAddress][_account] = rewardPerTokenStored[tokenAddress];
             }
         }
+        lastUpdateTime = lastTimeRewardApplicable();
         _;
     }
 
