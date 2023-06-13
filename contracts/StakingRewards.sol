@@ -8,11 +8,15 @@
 // - Baal <baal@elklabs.org>
 // - Elijah <elijah@elklabs.org>
 // - Snake <snake@elklabs.org>
+// - Real-Hansolo <real-hansolo@elklabs.org>
 
 pragma solidity >=0.8.0;
 
-import "./StakingFee.sol";
-import "./interfaces/IStakingRewards.sol";
+import { StakingFee } from "./StakingFee.sol";
+import { IStakingRewards } from "./interfaces/IStakingRewards.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
  * Contract implementing simple ERC20 token staking functionality with staking rewards and deposit/withdrawal fees.
@@ -26,7 +30,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
     IERC20[] public rewardTokens;
 
     /// @notice Reward token addresses (maps every reward token address to true, others to false)
-    mapping(address => bool) public rewardTokenAddresses;
+    mapping(address tokenAddress => bool isRewardToken) public rewardTokenAddresses;
 
     /// @notice Timestamp when rewards stop emitting
     uint256 public periodFinish;
@@ -37,18 +41,18 @@ contract StakingRewards is StakingFee, IStakingRewards {
     /// @notice Last time the rewards were updated
     uint256 public lastUpdateTime;
 
-    /// @notice Reward token rates (maps every reward token to an emission rate, i.e., how many tokens emitted per second)
-    mapping(address => uint256) public rewardRates;
+    /// @notice Reward token rates (maps every reward token to an emission rate,
+    //i.e., how many tokens emitted per second)
+    mapping(address token => uint256 emissionRate) public rewardRates;
 
     /// @notice How many tokens are emitted per staked token
-    mapping(address => uint256) public rewardPerTokenStored;
+    mapping(address token => uint256 emissionRate) public rewardPerTokenStored;
 
     /// @notice How many reward tokens were paid per user (token address => wallet address => amount)
-    mapping(address => mapping(address => uint256))
-        public userRewardPerTokenPaid;
+    mapping(address token => mapping(address walletAddress => uint256 amount)) public userRewardPerTokenPaid;
 
     /// @notice Accumulator of reward tokens per user (token address => wallet address => amount)
-    mapping(address => mapping(address => uint256)) public rewards;
+    mapping(address token => mapping(address walletAddress => uint256 amount)) public rewards;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -67,14 +71,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
         uint16 _depositFeeBps,
         uint16[] memory _withdrawalFeesBps,
         uint32[] memory _withdrawalFeeSchedule
-    )
-        StakingFee(
-            _stakingTokenAddress,
-            _depositFeeBps,
-            _withdrawalFeesBps,
-            _withdrawalFeeSchedule
-        )
-    {
+    ) StakingFee(_stakingTokenAddress, _depositFeeBps, _withdrawalFeesBps, _withdrawalFeeSchedule) {
         require(_rewardTokenAddresses.length > 0, "E9");
         // update reward data structures
         for (uint i = 0; i < _rewardTokenAddresses.length; ++i) {
@@ -87,7 +84,8 @@ contract StakingRewards is StakingFee, IStakingRewards {
     /* ========== VIEWS ========== */
 
     /**
-     * @notice Return the last time rewards are applicable (the lowest of the current timestamp and the rewards expiry timestamp).
+     * @notice Return the last time rewards are applicable (the lowest of the
+       current timestamp and the rewards expiry timestamp).
      * @return timestamp
      */
     function lastTimeRewardApplicable() public view returns (uint256) {
@@ -99,9 +97,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @param _tokenAddress reward token address
      * @return amount of reward per staked token
      */
-    function rewardPerToken(
-        address _tokenAddress
-    ) public view returns (uint256) {
+    function rewardPerToken(address _tokenAddress) public view returns (uint256) {
         if (totalSupply == 0) {
             return rewardPerTokenStored[_tokenAddress];
         }
@@ -109,7 +105,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
             rewardPerTokenStored[_tokenAddress] +
             ((lastTimeRewardApplicable() - lastUpdateTime) *
                 rewardRates[_tokenAddress] *
-                1e18) /
+                10 ** ERC20(_tokenAddress).decimals()) /
             totalSupply;
     }
 
@@ -119,15 +115,10 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @param _account user wallet address
      * @return amount earned
      */
-    function earned(
-        address _tokenAddress,
-        address _account
-    ) public view returns (uint256) {
+    function earned(address _tokenAddress, address _account) public view returns (uint256) {
         return
-            (balances[_account] *
-                (rewardPerToken(_tokenAddress) -
-                    userRewardPerTokenPaid[_tokenAddress][_account])) /
-            1e18 +
+            (balances[_account] * (rewardPerToken(_tokenAddress) - userRewardPerTokenPaid[_tokenAddress][_account])) /
+            10 ** ERC20(_tokenAddress).decimals() +
             rewards[_tokenAddress][_account];
     }
 
@@ -139,10 +130,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @param _recipient the address of the staker that should receive the reward
      * @ return amount of reward received
      */
-    function getReward(
-        address _tokenAddress,
-        address _recipient
-    ) public nonReentrant updateRewards(_recipient) {
+    function getReward(address _tokenAddress, address _recipient) public nonReentrant updateRewards(_recipient) {
         return _getReward(_tokenAddress, _recipient);
     }
 
@@ -150,31 +138,24 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @dev claim rewards for all the reward tokens for the staker
      * @param _recipient address of the recipient to receive the rewards
      */
-    function getRewards(
-        address _recipient
-    ) public nonReentrant updateRewards(_recipient) {
+    function getRewards(address _recipient) public nonReentrant updateRewards(_recipient) {
         for (uint i = 0; i < rewardTokens.length; ++i) {
             _getReward(address(rewardTokens[i]), _recipient);
         }
     }
 
     /**
-     * @dev Start the emission of rewards to stakers. The owner must send reward tokens to the contract before calling this function.
-     * Note: Can only be called by owner when the contract is not emitting rewards.
+     * @dev Start the emission of rewards to stakers. The owner must send reward
+       tokens to the contract before calling this function.
+     * Note: Can only be called by owner when the contract is not emitting
+       rewards.
      * @param _rewards array of rewards amounts for each reward token
      * @param _duration duration in seconds for which rewards will be emitted
      */
     function startEmission(
         uint256[] memory _rewards,
         uint256 _duration
-    )
-        public
-        virtual
-        nonReentrant
-        onlyOwner
-        whenNotEmitting
-        updateRewards(address(0))
-    {
+    ) public virtual nonReentrant onlyOwner whenNotEmitting updateRewards(address(0)) {
         require(_duration > 0, "E10");
         require(_rewards.length == rewardTokens.length, "E11");
 
@@ -193,17 +174,10 @@ contract StakingRewards is StakingFee, IStakingRewards {
             // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
             uint256 balance = rewardTokens[i].balanceOf(address(this));
             if (tokenAddress != address(stakingToken)) {
-                require(
-                    rewardRates[tokenAddress] <= balance / rewardsDuration,
-                    "E3"
-                );
+                require(rewardRates[tokenAddress] <= balance / rewardsDuration, "E3");
             } else {
                 // Handle carefully where rewardsToken is the same as stakingToken (need to subtract total supply)
-                require(
-                    rewardRates[tokenAddress] <=
-                        (balance - totalSupply) / rewardsDuration,
-                    "E3"
-                );
+                require(rewardRates[tokenAddress] <= (balance - totalSupply) / rewardsDuration, "E3");
             }
         }
 
@@ -218,9 +192,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * Note: can only be called by owner when the contract is currently emitting rewards
      * @param _refundAddress the address to receive the remaining reward tokens
      */
-    function stopEmission(
-        address _refundAddress
-    ) external nonReentrant onlyOwner whenEmitting {
+    function stopEmission(address _refundAddress) external nonReentrant onlyOwner whenEmitting {
         _beforeStopEmission(_refundAddress);
         uint256 remaining = 0;
         if (periodFinish > block.timestamp) {
@@ -247,10 +219,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @param _tokenAddress address of the reward token to be recovered
      * @param _recipient address to receive the recovered reward tokens
      */
-    function recoverLeftoverReward(
-        address _tokenAddress,
-        address _recipient
-    ) external onlyOwner whenNotEmitting {
+    function recoverLeftoverReward(address _tokenAddress, address _recipient) external onlyOwner whenNotEmitting {
         require(totalSupply == 0, "E12");
         if (rewardTokenAddresses[_tokenAddress]) {
             _beforeRecoverLeftoverReward(_tokenAddress, _recipient);
@@ -268,9 +237,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * Note: can only be called by owner when the contract is not emitting rewards
      * @param _tokenAddress address of the new reward token
      */
-    function addRewardToken(
-        address _tokenAddress
-    ) external onlyOwner whenNotEmitting {
+    function addRewardToken(address _tokenAddress) external onlyOwner whenNotEmitting {
         _addRewardToken(_tokenAddress);
     }
 
@@ -279,9 +246,7 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @param _tokenAddress address of the LP token
      * @return the array index for _tokenAddress or -1 if it is not a reward token
      */
-    function rewardTokenIndex(
-        address _tokenAddress
-    ) public view returns (int8) {
+    function rewardTokenIndex(address _tokenAddress) public view returns (int8) {
         if (rewardTokenAddresses[_tokenAddress]) {
             for (uint i = 0; i < rewardTokens.length; ++i) {
                 if (address(rewardTokens[i]) == _tokenAddress) {
@@ -326,7 +291,8 @@ contract StakingRewards is StakingFee, IStakingRewards {
     /* ========== HOOKS ========== */
 
     /**
-     * @dev Override _beforeStake() hook to ensure staking is only possible when rewards are emitting and update the rewards
+     * @dev Override _beforeStake() hook to ensure staking is only possible when
+       rewards are emitting and update the rewards
      */
     function _beforeStake(
         address _account,
@@ -339,47 +305,41 @@ contract StakingRewards is StakingFee, IStakingRewards {
      * @dev Override _beforeExit() hook to claim all rewards for the account exiting
      */
     function _beforeExit(address _account) internal virtual override {
-        getRewards(_account); // getRewards calls updateRewards so we don't need to call it explicitly again here
+        // getRewards calls updateRewards so we don't need to call it explicitly again here
+        getRewards(_account);
         super._beforeExit(_account);
     }
 
     /**
      * @dev Override _beforeRecoverERC20() hook to prevent recovery of a reward token
      */
-    function _beforeRecoverERC20(
-        address _tokenAddress,
-        address _recipient,
-        uint256 _amount
-    ) internal virtual override {
+    function _beforeRecoverERC20(address _tokenAddress, address _recipient, uint256 _amount) internal virtual override {
         require(!rewardTokenAddresses[_tokenAddress], "E16");
         super._beforeRecoverERC20(_tokenAddress, _recipient, _amount);
     }
 
     /**
-     * @dev Internal hook called before starting the emission process (in the startEmission() function).
+     * @dev Internal hook called before starting the emission process (in the
+       startEmission() function).
      * @param _rewards array of rewards per token.
      * @param _duration emission duration.
      */
-    function _beforeStartEmission(
-        uint256[] memory _rewards,
-        uint256 _duration
-    ) internal virtual {}
+    function _beforeStartEmission(uint256[] memory _rewards, uint256 _duration) internal virtual {}
 
     /**
-     * @dev Internal hook called before stopping the emission process (in the stopEmission() function).
+     * @dev Internal hook called before stopping the emission process (in the
+       stopEmission() function).
      * @param _refundAddress address to refund the remaining reward to
      */
     function _beforeStopEmission(address _refundAddress) internal virtual {}
 
     /**
-     * @dev Internal hook called before recovering leftover rewards (in the recoverLeftoverRewards() function).
+     * @dev Internal hook called before recovering leftover rewards (in the
+       recoverLeftoverRewards() function).
      * @param _tokenAddress address of the token to recover
      * @param _recipient address to recover the leftover rewards to
      */
-    function _beforeRecoverLeftoverReward(
-        address _tokenAddress,
-        address _recipient
-    ) internal virtual {}
+    function _beforeRecoverLeftoverReward(address _tokenAddress, address _recipient) internal virtual {}
 
     /* ========== MODIFIERS ========== */
 
@@ -391,12 +351,15 @@ contract StakingRewards is StakingFee, IStakingRewards {
         for (uint i = 0; i < rewardTokens.length; ++i) {
             address tokenAddress = address(rewardTokens[i]);
             rewardPerTokenStored[tokenAddress] = rewardPerToken(tokenAddress);
-            if (_account != address(0)) {
+        }
+        lastUpdateTime = lastTimeRewardApplicable();
+        if (_account != address(0)) {
+            for (uint i = 0; i < rewardTokens.length; ++i) {
+                address tokenAddress = address(rewardTokens[i]);
                 rewards[tokenAddress][_account] = earned(tokenAddress, _account);
                 userRewardPerTokenPaid[tokenAddress][_account] = rewardPerTokenStored[tokenAddress];
             }
         }
-        lastUpdateTime = lastTimeRewardApplicable();
         _;
     }
 

@@ -79,10 +79,7 @@ contract StakingFee is Staking, IStakingFee {
      * @param _withdrawalAmount amount to withdraw
      * @return fee paid upon withdrawal
      */
-    function withdrawalFee(
-        address _account,
-        uint256 _withdrawalAmount
-    ) public view returns (uint256) {
+    function withdrawalFee(address _account, uint256 _withdrawalAmount) public view returns (uint256) {
         uint256 userLastStakedTimestampDiff = block.timestamp - userLastStakedTime[_account];
         uint256 withdrawalFeeAmount;
         for (uint i = 0; i < withdrawalFeeSchedule.length; ++i) {
@@ -93,7 +90,6 @@ contract StakingFee is Staking, IStakingFee {
         }
         return withdrawalFeeAmount;
     }
-
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
@@ -123,7 +119,12 @@ contract StakingFee is Staking, IStakingFee {
         uint16[] memory _withdrawalFeesBps,
         uint32[] memory _withdrawalFeeSchedule
     ) private {
-        require(_withdrawalFeeSchedule.length == _withdrawalFeesBps.length && _withdrawalFeeSchedule.length <= 10 && _depositFeeBps <= maxFee, "E5");
+        require(
+            _withdrawalFeeSchedule.length == _withdrawalFeesBps.length &&
+                _withdrawalFeeSchedule.length <= 10 &&
+                _depositFeeBps <= maxFee,
+            "E5"
+        );
 
         uint32 lastFeeSchedule = 0;
         uint256 lastWithdrawalFee = maxFee + 1;
@@ -139,11 +140,7 @@ contract StakingFee is Staking, IStakingFee {
         withdrawalFeesBps = _withdrawalFeesBps;
         depositFeeBps = _depositFeeBps;
 
-        emit FeesSet(
-            _depositFeeBps,
-            _withdrawalFeesBps,
-            _withdrawalFeeSchedule
-        );
+        emit FeesSet(_depositFeeBps, _withdrawalFeesBps, _withdrawalFeeSchedule);
     }
 
     /* ========== HOOKS ========== */
@@ -151,10 +148,7 @@ contract StakingFee is Staking, IStakingFee {
     /**
      * @dev Override _beforeStake() hook to collect the deposit fee and update associated state
      */
-    function _beforeStake(
-        address _account,
-        uint256 _amount
-    ) internal virtual override returns (uint256) {
+    function _beforeStake(address _account, uint256 _amount) internal virtual override returns (uint256) {
         uint256 fee = depositFee(_amount);
         userLastStakedTime[_account] = uint32(block.timestamp);
         if (fee > 0) {
@@ -167,10 +161,7 @@ contract StakingFee is Staking, IStakingFee {
     /**
      * @dev Override _beforeWithdrawl() hook to collect the withdrawal fee and update associated state
      */
-    function _beforeWithdraw(
-        address _account,
-        uint256 _amount
-    ) internal virtual override returns (uint256) {
+    function _beforeWithdraw(address _account, uint256 _amount) internal virtual override returns (uint256) {
         uint256 fee = withdrawalFee(_account, _amount);
         if (fee > 0) {
             collectedFees += fee;

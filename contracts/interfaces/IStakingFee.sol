@@ -31,23 +31,16 @@ interface IStakingFee is IStaking {
 
     function depositFee(uint256 _depositAmount) external view returns (uint256);
 
-    function withdrawalFee(
-        address _account,
-        uint256 _withdrawalAmount
-    ) external view returns (uint256);
+    function withdrawalFee(address _account, uint256 _withdrawalAmount) external view returns (uint256);
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function recoverFees(address _recipient) external;
-    
+
     /* ========== EVENTS ========== */
 
     // Emitted when fees are (re)configured
-    event FeesSet(
-        uint16 _depositFeeBps,
-        uint16[] _withdrawalFeesBps,
-        uint32[] _feeSchedule
-    );
+    event FeesSet(uint16 _depositFeeBps, uint16[] _withdrawalFeesBps, uint32[] _feeSchedule);
 
     // Emitted when a deposit fee is collected
     event DepositFeesCollected(address indexed _user, uint256 _amount);

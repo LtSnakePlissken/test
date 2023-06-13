@@ -26,9 +26,7 @@ interface IElkDexOracle {
 
     function periodSize() external view returns (uint);
 
-    function pairObservations(
-        address _pair
-    ) external view returns (Observation[] memory);
+    function pairObservations(address _pair) external view returns (Observation[] memory);
 
     function observationIndexOf(uint _timestamp) external view returns (uint);
 
@@ -36,14 +34,7 @@ interface IElkDexOracle {
 
     function updateWeth(address _token) external;
 
-    function consult(
-        address _tokenIn,
-        uint _amountIn,
-        address _tokenOut
-    ) external view returns (uint);
+    function consult(address _tokenIn, uint _amountIn, address _tokenOut) external view returns (uint);
 
-    function consultWeth(
-        address _tokenIn,
-        uint _amountIn
-    ) external view returns (uint);
+    function consultWeth(address _tokenIn, uint _amountIn) external view returns (uint);
 }

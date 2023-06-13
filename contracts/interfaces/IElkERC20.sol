@@ -23,20 +23,13 @@ interface IElkERC20 {
 
     function balanceOf(address _owner) external view returns (uint);
 
-    function allowance(
-        address _owner,
-        address _spender
-    ) external view returns (uint);
+    function allowance(address _owner, address _spender) external view returns (uint);
 
     function approve(address _spender, uint _value) external returns (bool);
 
     function transfer(address _to, uint _value) external returns (bool);
 
-    function transferFrom(
-        address _from,
-        address _to,
-        uint _value
-    ) external returns (bool);
+    function transferFrom(address _from, address _to, uint _value) external returns (bool);
 
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 

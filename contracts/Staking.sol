@@ -8,13 +8,16 @@
 // - Baal <baal@elklabs.org>
 // - Elijah <elijah@elklabs.org>
 // - Snake <snake@elklabs.org>
+// - Real-Hansolo <real-hansolo@elklabs.org>
 
 pragma solidity >=0.8.0;
 
-import "@openzeppelin/contracts@4.8.0/access/Ownable.sol";
-import "@openzeppelin/contracts@4.8.0/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts@4.8.0/token/ERC20/utils/SafeERC20.sol";
-import "./interfaces/IStaking.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IStaking } from "./interfaces/IStaking.sol";
 
 /**
  * Base contract implementing simple ERC20 token staking functionality (no staking rewards).
@@ -31,7 +34,10 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
     uint256 public totalSupply;
 
     /// @notice Account balances
-    mapping(address => uint256) public balances;
+    mapping(address account => uint256 balance) public balances;
+
+    // Scaling factor: supply is always stored as wei (10**18) regardless of the token's decimals
+    uint256 private supplyScalingFactor;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -39,6 +45,7 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
     constructor(address _stakingTokenAddress) {
         require(_stakingTokenAddress != address(0), "E1");
         stakingToken = IERC20(_stakingTokenAddress);
+        supplyScalingFactor = 1e18 / 10 ** ERC20(_stakingTokenAddress).decimals();
     }
 
     /**
@@ -50,7 +57,7 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
         uint256 originalAmount = _amount;
         _amount = _beforeStake(msg.sender, _amount);
         require(_amount > 0 && originalAmount > 0, "E2"); // Check after the hook
-        totalSupply += _amount;
+        totalSupply += _amount * supplyScalingFactor;
         balances[msg.sender] += _amount;
         stakingToken.safeTransferFrom(msg.sender, address(this), originalAmount);
         emit Staked(msg.sender, _amount);
@@ -63,11 +70,9 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
     function withdraw(uint256 _amount) public nonReentrant {
         uint256 originalAmount = _amount;
         _amount = _beforeWithdraw(msg.sender, _amount);
-        require(
-            _amount > 0 && _amount <= balances[msg.sender] && originalAmount <= balances[msg.sender],
-            "E3"
-        ); // Check after the hook
-        totalSupply -= originalAmount;
+        // Check after the hook
+        require(_amount > 0 && _amount <= balances[msg.sender] && originalAmount <= balances[msg.sender], "E3");
+        totalSupply -= originalAmount * supplyScalingFactor;
         balances[msg.sender] -= originalAmount;
         stakingToken.safeTransfer(msg.sender, _amount);
         emit Withdrawn(msg.sender, _amount);
@@ -92,15 +97,8 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
      * @param _amount amount to withdraw
      * @ return withdrawn amount (may differ from input amount due to e.g., fees)
      */
-    function recoverERC20(
-        address _tokenAddress,
-        address _recipient,
-        uint256 _amount
-    ) external nonReentrant onlyOwner {
-        require(
-            _tokenAddress != address(stakingToken),
-            "E4"
-        );
+    function recoverERC20(address _tokenAddress, address _recipient, uint256 _amount) external nonReentrant onlyOwner {
+        require(_tokenAddress != address(stakingToken), "E4");
         _beforeRecoverERC20(_tokenAddress, _recipient, _amount);
         IERC20 token = IERC20(_tokenAddress);
         token.safeTransfer(_recipient, _amount);
@@ -115,10 +113,7 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
      * @param _amount amount being staken
      * @return amount to stake (may be changed by the hook)
      */
-    function _beforeStake(
-        address /*_account*/,
-        uint256 _amount
-    ) internal virtual returns (uint256) {
+    function _beforeStake(address /*_account*/, uint256 _amount) internal virtual returns (uint256) {
         return _amount;
     }
 
@@ -128,10 +123,7 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
      * @param _amount amount being withdrawn
      * @return amount to withdraw (may be changed by the hook)
      */
-    function _beforeWithdraw(
-        address /*_account*/,
-        uint256 _amount
-    ) internal virtual returns (uint256) {
+    function _beforeWithdraw(address /*_account*/, uint256 _amount) internal virtual returns (uint256) {
         return _amount;
     }
 
@@ -148,9 +140,5 @@ contract Staking is ReentrancyGuard, Ownable, IStaking {
      * @param _recipient recovery address
      * @param _amount amount being withdrawn
      */
-    function _beforeRecoverERC20(
-        address _tokenAddress,
-        address _recipient,
-        uint256 _amount
-    ) internal virtual {}
+    function _beforeRecoverERC20(address _tokenAddress, address _recipient, uint256 _amount) internal virtual {}
 }

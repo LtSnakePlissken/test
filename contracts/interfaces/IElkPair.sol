@@ -23,20 +23,13 @@ interface IElkPair {
 
     function balanceOf(address _owner) external view returns (uint);
 
-    function allowance(
-        address _owner,
-        address _spender
-    ) external view returns (uint);
+    function allowance(address _owner, address _spender) external view returns (uint);
 
     function approve(address _spender, uint _value) external returns (bool);
 
     function transfer(address _to, uint _value) external returns (bool);
 
-    function transferFrom(
-        address _from,
-        address _to,
-        uint _value
-    ) external returns (bool);
+    function transferFrom(address _from, address _to, uint _value) external returns (bool);
 
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 
@@ -55,12 +48,7 @@ interface IElkPair {
     ) external;
 
     event Mint(address indexed sender, uint amount0, uint amount1);
-    event Burn(
-        address indexed sender,
-        uint amount0,
-        uint amount1,
-        address indexed to
-    );
+    event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
     event Swap(
         address indexed sender,
         uint amount0In,
@@ -79,14 +67,7 @@ interface IElkPair {
 
     function token1() external view returns (address);
 
-    function getReserves()
-        external
-        view
-        returns (
-            uint112 _reserve0,
-            uint112 _reserve1,
-            uint32 _blockTimestampLast
-        );
+    function getReserves() external view returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast);
 
     function price0CumulativeLast() external view returns (uint);
 
@@ -98,12 +79,7 @@ interface IElkPair {
 
     function burn(address _to) external returns (uint amount0, uint amount1);
 
-    function swap(
-        uint _amount0Out,
-        uint _amount1Out,
-        address _to,
-        bytes calldata _data
-    ) external;
+    function swap(uint _amount0Out, uint _amount1Out, address _to, bytes calldata _data) external;
 
     function skim(address _to) external;
 

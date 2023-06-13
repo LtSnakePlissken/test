@@ -9,7 +9,7 @@
 
 pragma solidity >=0.8.0;
 
-import "@openzeppelin/contracts@4.8.0/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IStaking {
     /* ========== STATE VARIABLES ========== */
@@ -26,11 +26,7 @@ interface IStaking {
 
     function exit() external;
 
-    function recoverERC20(
-        address _tokenAddress,
-        address _recipient,
-        uint256 _amount
-    ) external;
+    function recoverERC20(address _tokenAddress, address _recipient, uint256 _amount) external;
 
     /* ========== EVENTS ========== */
 
@@ -41,9 +37,5 @@ interface IStaking {
     event Withdrawn(address indexed account, uint256 amount);
 
     // Emitted on token recovery
-    event Recovered(
-        address indexed token,
-        address indexed recipient,
-        uint256 amount
-    );
+    event Recovered(address indexed token, address indexed recipient, uint256 amount);
 }
